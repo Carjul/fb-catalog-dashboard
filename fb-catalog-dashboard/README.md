@@ -42,6 +42,26 @@ Dashboard local para crear y gestionar campañas Advantage+ Catalog Ads en Faceb
 
 ## Docker produccion
 
+Si vas a correr solo la app, necesitas que `MONGODB_URI` apunte a un MongoDB real y accesible. Si no, el contenedor falla al iniciar.
+
+Opcion A: usar Docker Compose con Mongo incluido
+
+1. Copiar variables:
+   ```bash
+   cp .env.example .env
+   ```
+2. Levantar app + mongo:
+   ```bash
+   docker compose up --build -d
+   ```
+3. Abrir `http://localhost:5000`
+4. Ver logs si algo falla:
+   ```bash
+   docker compose logs -f app
+   ```
+
+Opcion B: usar solo la imagen con Mongo externo
+
 1. Construir imagen:
    ```bash
    docker build -t fb-catalog-dashboard .
@@ -58,7 +78,9 @@ Dashboard local para crear y gestionar campañas Advantage+ Catalog Ads en Faceb
    ```
 3. Abrir `http://localhost:5000`
 
-Si usas MongoDB Atlas, cambia `MONGODB_URI` por tu URI remota.
+Si usas Linux o un servidor cloud, `host.docker.internal` normalmente no funciona; en ese caso usa:
+- `docker-compose.yml` con el servicio `mongo`, o
+- una URI remota como MongoDB Atlas
 
 ## Flujo de uso
 
@@ -78,7 +100,9 @@ Si usas MongoDB Atlas, cambia `MONGODB_URI` por tu URI remota.
 
 ## Deploy a Render
 
-Ver [INSTALL.md](INSTALL.md).
+Render usa solo el contenedor web; no ejecuta `docker-compose.yml`. Para Render necesitas `MONGODB_URI` apuntando a un Mongo externo, normalmente MongoDB Atlas.
+
+Ver `INSTALL.md`.
 
 ## Estructura
 

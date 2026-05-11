@@ -20,26 +20,26 @@ Guía para el programador que va a deployar este dashboard a producción.
    ```
 
 2. **En Render:** New → Blueprint → conectar el repo
-   - Render detecta automáticamente `render.yaml` y configura todo
-   - Configura una base MongoDB accesible desde Render o MongoDB Atlas
+   - Render detecta automáticamente `render.yaml` y usa el `Dockerfile`
+   - `docker-compose.yml` no se usa en Render; solo corre el contenedor web
+   - Configura un MongoDB externo accesible desde Render, idealmente MongoDB Atlas
 
 3. **Variables de entorno (en panel de Render):**
-   - `FB_ACCESS_TOKEN`: token long-lived con scopes
-     - `ads_management`
-     - `business_management`
-     - `catalog_management`
    - `PUBLIC_BASE_URL`: la URL final de Render (ej: `https://fb-catalog-dashboard.onrender.com`) — IMPORTANTE: este es el URL que Meta consultará para el feed CSV
    - `SESSION_SECRET`: Render lo autogenera
-   - `MONGODB_URI`: URI de conexion a MongoDB
+   - `MONGODB_URI`: URI de conexion a MongoDB Atlas o cualquier Mongo publico/privado accesible desde Render
    - `MONGODB_DB_NAME`: nombre de la base de datos
+   - `TRICK_RUNNER_INTERVAL`: opcional, default `3600`
+   - `FB_ACCESS_TOKEN`: opcional, solo como fallback inicial; luego puedes gestionar tokens desde `/setup`
 
-4. **Deploy:** Render compila + arranca automáticamente
+4. **Deploy:** Render construye la imagen Docker y arranca automáticamente
 
 5. **Acceder:** la URL aparece en el panel de Render. Visitar `/setup` para configurar BM, cuenta, página, pixel.
 
 ## Notas técnicas
 
 - **MongoDB:** la app usa `MONGODB_URI` y `MONGODB_DB_NAME`; no depende de disco persistente local.
+- **Importante:** no uses `mongodb://localhost:27017` ni `host.docker.internal` en Render; desde Render debes usar una URI externa real.
 - **Token expiration:** Long-lived tokens duran 60 días. Renovar en Graph API Explorer y actualizar `FB_ACCESS_TOKEN` en Render.
 - **Cron interval:** controlado por `TRICK_RUNNER_INTERVAL` (default 3600s = 1h). Cambiar en env si se necesita.
 - **Rate limits Meta:** el wrapper hace retry exponencial en 429 / códigos transitorios.
