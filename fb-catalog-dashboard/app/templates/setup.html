@@ -1,0 +1,126 @@
+{% extends "base.html" %}
+{% from "_macros.html" import tip, icon %}
+{% block content %}
+<h1 class="text-3xl font-bold mb-6 title-setup flex items-center gap-3">{{ icon('settings') }}Configuración</h1>
+
+{% if not token_set %}
+<div class="bg-err/10 border border-err rounded p-4 mb-6 flex items-start gap-3">
+  {{ icon('alert-triangle', 'lucide-icon text-err') }}
+  <div>
+    <strong class="text-err">Falta FB_ACCESS_TOKEN.</strong>
+    <p class="text-sm mt-1">Pega un token de Meta Marketing API en tu <code>.env</code> con scopes <code>ads_management, business_management, catalog_management</code> y reinicia.</p>
+  </div>
+</div>
+{% endif %}
+
+{% if error %}<div class="bg-err/10 border border-err rounded p-3 mb-4 text-sm text-err">{{ error }}</div>{% endif %}
+
+<p class="text-sm text-muted mb-6 flex items-center gap-2">{{ icon('info') }}Para cambiar tema o idioma usa los botones en la esquina inferior izquierda del sidebar.</p>
+
+<form method="post" class="bg-panel border border-border rounded-lg p-6 space-y-5">
+  <h2 class="font-semibold flex items-center gap-2">{{ icon('plug') }}Conexiones por default a Meta</h2>
+  <div>
+    <label class="block text-sm font-medium mb-1 flex items-center">Business Manager por default
+      {{ tip("Si tienes múltiples BMs, elige el que usarás para crear catálogos. Se prellena al crear nuevos catálogos.") }}
+    </label>
+    <select name="business_id" class="w-full bg-bg border border-border rounded px-3 py-2">
+      <option value="">— Ninguno —</option>
+      {% for b in businesses %}
+      <option value="{{ b.id }}" {% if settings and settings.default_business_id == b.id %}selected{% endif %}>{{ b.name }} ({{ b.id }})</option>
+      {% endfor %}
+    </select>
+  </div>
+
+  <div>
+    <label class="block text-sm font-medium mb-1 flex items-center">Cuenta publicitaria por default
+      {{ tip("La cuenta de ad account donde se crearán las campañas por default. Puedes cambiarla en cada campaña.") }}
+    </label>
+    <select name="ad_account_id" class="w-full bg-bg border border-border rounded px-3 py-2">
+      <option value="">— Ninguna —</option>
+      {% for a in accounts %}
+      <option value="{{ a.id }}" {% if settings and settings.default_ad_account_id == a.id %}selected{% endif %}>{{ a.name }} ({{ a.currency }})</option>
+      {% endfor %}
+    </select>
+  </div>
+
+  <div>
+    <label class="block text-sm font-medium mb-1 flex items-center">Página de Facebook por default
+      {{ tip("La página/fan page que aparecerá como anunciante en los anuncios. Si tienes varias por nicho, puedes cambiarla en cada campaña.") }}
+    </label>
+    <select name="page_id" class="w-full bg-bg border border-border rounded px-3 py-2">
+      <option value="">— Ninguna —</option>
+      {% for p in pages %}
+      <option value="{{ p.id }}" {% if settings and settings.default_page_id == p.id %}selected{% endif %}>{{ p.name }}</option>
+      {% endfor %}
+    </select>
+  </div>
+
+  <div>
+    <label class="block text-sm font-medium mb-1 flex items-center">Pixel por default
+      {{ tip("El pixel que trackea conversiones. Si tienes 2 landers con pixeles distintos, configúralo en cada campaña.") }}
+    </label>
+    <select name="pixel_id" class="w-full bg-bg border border-border rounded px-3 py-2">
+      <option value="">— Ninguno —</option>
+      {% for p in pixels %}
+      <option value="{{ p.id }}" {% if settings and settings.default_pixel_id == p.id %}selected{% endif %}>{{ p.name }} ({{ p.id }})</option>
+      {% endfor %}
+    </select>
+    <p class="text-xs text-muted mt-1">Los pixeles se cargan según la cuenta seleccionada. Guarda y refresca para ver los pixeles de la cuenta nueva.</p>
+  </div>
+
+  <button type="submit" class="bg-accent hover:bg-accent/80 text-white px-5 py-2 rounded font-medium flex items-center gap-2">{{ icon('save') }}Guardar</button>
+</form>
+
+<div class="bg-panel border border-border rounded-lg p-6 mt-6 space-y-5">
+  <h2 class="font-semibold flex items-center gap-2">{{ icon('bell') }}Notificaciones (Telegram / Slack)</h2>
+  <p class="text-sm text-muted">Cuando un ad sea aprobado o llegue una conversión nueva, recibe un mensaje. Se revisa cada hora junto con el cron del truco.</p>
+
+  <form method="post" action="/setup" class="space-y-5">
+    <input type="hidden" name="business_id" value="{{ settings.default_business_id or '' }}">
+    <input type="hidden" name="ad_account_id" value="{{ settings.default_ad_account_id or '' }}">
+    <input type="hidden" name="page_id" value="{{ settings.default_page_id or '' }}">
+    <input type="hidden" name="pixel_id" value="{{ settings.default_pixel_id or '' }}">
+
+    <div class="grid grid-cols-2 gap-4">
+      <div>
+        <label class="block text-sm font-medium mb-1 flex items-center">Telegram Bot Token
+          {{ tip("Crea un bot con @BotFather en Telegram → te da un token tipo '1234567890:ABC...'. Pégalo aquí.") }}
+        </label>
+        <input spellcheck="false" name="telegram_bot_token" value="{{ settings.telegram_bot_token or '' }}" class="w-full bg-bg border border-border rounded px-3 py-2 font-mono text-xs" placeholder="1234567890:ABC...">
+      </div>
+      <div>
+        <label class="block text-sm font-medium mb-1 flex items-center">Telegram Chat ID
+          {{ tip("ID del chat donde quieres recibir mensajes. Si es tu chat privado, escríbele a @userinfobot y te dice tu ID. Para grupo, agrega @userinfobot al grupo. Puede ser negativo para grupos.") }}
+        </label>
+        <input spellcheck="false" name="telegram_chat_id" value="{{ settings.telegram_chat_id or '' }}" class="w-full bg-bg border border-border rounded px-3 py-2 font-mono text-xs" placeholder="123456789">
+      </div>
+    </div>
+
+    <div>
+      <label class="block text-sm font-medium mb-1 flex items-center">Slack Webhook URL
+        {{ tip("En Slack: App Directory → 'Incoming Webhooks' → instalar → te da una URL https://hooks.slack.com/services/... Pégala aquí.") }}
+      </label>
+      <input spellcheck="false" name="slack_webhook_url" value="{{ settings.slack_webhook_url or '' }}" class="w-full bg-bg border border-border rounded px-3 py-2 font-mono text-xs" placeholder="https://hooks.slack.com/services/...">
+    </div>
+
+    <div class="grid grid-cols-2 gap-4">
+      <label class="flex items-center gap-2 cursor-pointer bg-bg border border-border rounded p-3">
+        <input type="checkbox" name="notify_on_approval" value="yes" {% if settings.notify_on_approval %}checked{% endif %} class="w-4 h-4">
+        <span class="text-sm">Notificar cuando un ad sea aprobado</span>
+      </label>
+      <label class="flex items-center gap-2 cursor-pointer bg-bg border border-border rounded p-3">
+        <input type="checkbox" name="notify_on_conversion" value="yes" {% if settings.notify_on_conversion %}checked{% endif %} class="w-4 h-4">
+        <span class="text-sm">Notificar cuando llegue una conversión nueva</span>
+      </label>
+    </div>
+
+    <button type="submit" class="bg-accent hover:bg-accent/80 text-white px-5 py-2 rounded font-medium flex items-center gap-2">{{ icon('save') }}Guardar notificaciones</button>
+  </form>
+
+  <form method="post" action="/setup/test-notification" class="border-t border-border pt-4">
+    <button class="bg-panel border border-border hover:bg-border px-4 py-2 rounded text-sm flex items-center gap-2">{{ icon('send') }}Enviar mensaje de prueba</button>
+    <p class="text-xs text-muted mt-2">Manda un mensaje de test a Telegram y Slack para verificar que funciona.</p>
+  </form>
+</div>
+
+{% endblock %}

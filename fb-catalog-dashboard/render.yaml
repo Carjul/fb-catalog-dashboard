@@ -1,0 +1,26 @@
+services:
+  - type: web
+    name: fb-catalog-dashboard
+    env: python
+    plan: starter
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: FB_ACCESS_TOKEN
+        sync: false
+      - key: FB_API_VERSION
+        value: v21.0
+      - key: PUBLIC_BASE_URL
+        sync: false
+      - key: PORT
+        value: "10000"
+      - key: SESSION_SECRET
+        generateValue: true
+      - key: MONGODB_URI
+        sync: false
+      - key: MONGODB_DB_NAME
+        value: fb_catalog_dashboard
+      - key: TRICK_RUNNER_INTERVAL
+        value: "3600"
+      - key: PYTHON_VERSION
+        value: "3.11.9"
