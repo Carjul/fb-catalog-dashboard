@@ -7,8 +7,9 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from starlette.middleware.sessions import SessionMiddleware
 
-from .config import SESSION_SECRET, FB_ACCESS_TOKEN, PUBLIC_BASE_URL
-from .database import Base, MongoSession, engine, get_db, migrate_db
+from .config import SESSION_SECRET, PUBLIC_BASE_URL
+from .database import Base, MongoSession, SessionLocal, engine, get_db, migrate_db
+from .meta_connections import get_active_connection, get_active_token, upsert_env_connection
 from .models import Catalog, Product, ProductSet, Campaign, CampaignTemplate
 from .routers import setup, catalogs, products, sets, campaigns, templates as tpl_router, trick, feed
 from .trick_runner import start_scheduler, stop_scheduler
@@ -20,8 +21,13 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name
 async def lifespan(app: FastAPI):
     Base.metadata.create_all(bind=engine)
     migrate_db()
-    if FB_ACCESS_TOKEN:
-        start_scheduler()
+    db = SessionLocal()
+    try:
+        upsert_env_connection(db)
+        if get_active_token(db):
+            start_scheduler()
+    finally:
+        db.close()
     yield
     stop_scheduler()
 
@@ -45,6 +51,7 @@ app.include_router(feed.router)
 
 @app.get("/", response_class=HTMLResponse)
 def home(request: Request, db: MongoSession = Depends(get_db)):
+    active_connection = get_active_connection(db)
     stats = {
         "catalogs": db.query(Catalog).count(),
         "products": db.query(Product).count(),
@@ -59,7 +66,8 @@ def home(request: Request, db: MongoSession = Depends(get_db)):
     return templates.TemplateResponse(request, "home.html", {
         "request": request, "stats": stats,
         "pending_trick": pending_trick,
-        "token_set": bool(FB_ACCESS_TOKEN),
+        "token_set": bool(get_active_token(db)),
+        "active_connection": active_connection,
         "public_base": PUBLIC_BASE_URL,
     })
 

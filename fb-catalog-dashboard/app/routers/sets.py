@@ -3,6 +3,7 @@ from fastapi.responses import RedirectResponse
 
 from .. import meta_api
 from ..database import MongoSession, get_db
+from ..meta_connections import get_active_token
 from ..models import Catalog, Product, ProductSet
 
 router = APIRouter()
@@ -80,9 +81,12 @@ async def create_set(cat_id: int, request: Request, db: MongoSession = Depends(g
     retailer_ids = [p.retailer_id for p in products]
 
     fb_set_id = None
+    token = get_active_token(db)
     if sync_to_meta and not cat.fb_catalog_id.startswith("local-"):
+        if not token:
+            return RedirectResponse(f"/catalogs/{cat_id}/sets/new?error=no_active_meta_connection", status_code=303)
         try:
-            res = meta_api.create_product_set(cat.fb_catalog_id, name, retailer_ids)
+            res = meta_api.create_product_set(cat.fb_catalog_id, name, retailer_ids, token=token)
             fb_set_id = res.get("id")
         except Exception as e:
             return RedirectResponse(f"/catalogs/{cat_id}/sets/new?error={str(e)[:80]}", status_code=303)
@@ -133,11 +137,14 @@ async def update_set(cat_id: int, set_id: int, request: Request, db: MongoSessio
     pset.retailer_ids = retailer_ids
 
     if sync_to_meta and not cat.fb_catalog_id.startswith("local-"):
+        token = get_active_token(db)
+        if not token:
+            return RedirectResponse(f"/catalogs/{cat_id}/sets/{set_id}/edit?error=no_active_meta_connection", status_code=303)
         try:
             if pset.fb_set_id:
-                meta_api.update_product_set(pset.fb_set_id, name, retailer_ids)
+                meta_api.update_product_set(pset.fb_set_id, name, retailer_ids, token=token)
             else:
-                res = meta_api.create_product_set(cat.fb_catalog_id, name, retailer_ids)
+                res = meta_api.create_product_set(cat.fb_catalog_id, name, retailer_ids, token=token)
                 pset.fb_set_id = res.get("id")
         except Exception as e:
             return RedirectResponse(f"/catalogs/{cat_id}/sets/{set_id}/edit?error={str(e)[:80]}", status_code=303)
@@ -154,11 +161,14 @@ def sync_set(cat_id: int, set_id: int, db: MongoSession = Depends(get_db)):
         raise HTTPException(404)
     if cat.fb_catalog_id.startswith("local-"):
         return RedirectResponse(f"/catalogs/{cat_id}/sets?error=catalog_not_synced", status_code=303)
+    token = get_active_token(db)
+    if not token:
+        return RedirectResponse(f"/catalogs/{cat_id}/sets?error=no_active_meta_connection", status_code=303)
     try:
         if pset.fb_set_id:
-            meta_api.update_product_set(pset.fb_set_id, pset.name, pset.retailer_ids or [])
+            meta_api.update_product_set(pset.fb_set_id, pset.name, pset.retailer_ids or [], token=token)
         else:
-            res = meta_api.create_product_set(cat.fb_catalog_id, pset.name, pset.retailer_ids or [])
+            res = meta_api.create_product_set(cat.fb_catalog_id, pset.name, pset.retailer_ids or [], token=token)
             pset.fb_set_id = res.get("id")
         db.commit()
     except Exception as e:

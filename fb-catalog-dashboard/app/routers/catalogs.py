@@ -4,6 +4,7 @@ from fastapi.responses import RedirectResponse
 
 from .. import meta_api
 from ..database import MongoSession, get_db
+from ..meta_connections import get_active_token
 from ..models import Catalog, AppSettings
 from ..config import PUBLIC_BASE_URL
 
@@ -35,25 +36,32 @@ def create_catalog(
     business_id: str = Form(...),
     pixel_id: str = Form(""),
     sync_to_meta: str = Form(""),
-):
+): 
     feed_slug = secrets.token_urlsafe(8)
+    token = get_active_token(db)
 
     fb_catalog_id = ""
     fb_feed_id = None
     error = None
 
     if sync_to_meta == "yes":
+        if not token:
+            return request.app.state.templates.TemplateResponse(request, "catalogs/create.html", {
+                "request": request, "settings": db.query(AppSettings).first(),
+                "error": "No hay una conexion Meta activa",
+                "form": {"name": name, "business_id": business_id, "pixel_id": pixel_id},
+            }, status_code=400)
         try:
-            res = meta_api.create_catalog(business_id, name)
+            res = meta_api.create_catalog(business_id, name, token=token)
             fb_catalog_id = res["id"]
             if pixel_id:
                 try:
-                    meta_api.attach_pixel_to_catalog(fb_catalog_id, pixel_id)
+                    meta_api.attach_pixel_to_catalog(fb_catalog_id, pixel_id, token=token)
                 except Exception as e:
                     error = f"Catálogo creado pero falló asociar pixel: {e}"
             csv_url = f"{PUBLIC_BASE_URL}/feed/{feed_slug}.csv"
             try:
-                feed_res = meta_api.create_feed(fb_catalog_id, f"Feed {name}", csv_url)
+                feed_res = meta_api.create_feed(fb_catalog_id, f"Feed {name}", csv_url, token=token)
                 fb_feed_id = feed_res.get("id")
             except Exception as e:
                 error = (error + " | " if error else "") + f"Feed no creado: {e}"

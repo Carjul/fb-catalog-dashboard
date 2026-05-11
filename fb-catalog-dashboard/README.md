@@ -40,6 +40,26 @@ Dashboard local para crear y gestionar campañas Advantage+ Catalog Ads en Faceb
    ```
 6. Abrir 👉 [http://localhost:5000](http://localhost:5000)
 
+## Docker produccion
+
+1. Construir imagen:
+   ```bash
+   docker build -t fb-catalog-dashboard .
+   ```
+2. Correr contenedor:
+   ```bash
+   docker run --rm -p 5000:5000 \
+     -e PORT=5000 \
+     -e PUBLIC_BASE_URL=http://localhost:5000 \
+     -e SESSION_SECRET=change-me \
+     -e MONGODB_URI=mongodb://host.docker.internal:27017 \
+     -e MONGODB_DB_NAME=fb_catalog_dashboard \
+     fb-catalog-dashboard
+   ```
+3. Abrir `http://localhost:5000`
+
+Si usas MongoDB Atlas, cambia `MONGODB_URI` por tu URI remota.
+
 ## Flujo de uso
 
 1. **/setup** — Selecciona BM, ad account, página y pixel por default

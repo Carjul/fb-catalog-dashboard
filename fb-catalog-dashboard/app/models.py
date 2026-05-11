@@ -124,6 +124,22 @@ class AppSettings(Base):
     updated_at = field(default_factory=datetime.utcnow)
 
 
+class MetaConnection(Base):
+    __collection__ = "meta_connections"
+
+    id = field()
+    name = field(default="")
+    token = field(default="")
+    token_last4 = field(default="")
+    business_id = field()
+    business_name = field()
+    is_active = field(default=False)
+    is_valid = field(default=False)
+    last_error = field()
+    last_tested_at = field()
+    created_at = field(default_factory=datetime.utcnow)
+
+
 class Catalog(Base):
     __collection__ = "catalogs"
 

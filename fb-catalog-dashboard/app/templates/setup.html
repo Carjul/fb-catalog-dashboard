@@ -7,8 +7,8 @@
 <div class="bg-err/10 border border-err rounded p-4 mb-6 flex items-start gap-3">
   {{ icon('alert-triangle', 'lucide-icon text-err') }}
   <div>
-    <strong class="text-err">Falta FB_ACCESS_TOKEN.</strong>
-    <p class="text-sm mt-1">Pega un token de Meta Marketing API en tu <code>.env</code> con scopes <code>ads_management, business_management, catalog_management</code> y reinicia.</p>
+    <strong class="text-err">No hay una conexion Meta activa.</strong>
+    <p class="text-sm mt-1">Guarda al menos una conexion con token valido y actívala para usar toda la app.</p>
   </div>
 </div>
 {% endif %}
@@ -16,6 +16,100 @@
 {% if error %}<div class="bg-err/10 border border-err rounded p-3 mb-4 text-sm text-err">{{ error }}</div>{% endif %}
 
 <p class="text-sm text-muted mb-6 flex items-center gap-2">{{ icon('info') }}Para cambiar tema o idioma usa los botones en la esquina inferior izquierda del sidebar.</p>
+
+<div class="bg-panel border border-border rounded-lg p-6 space-y-5 mb-6">
+  <div class="flex items-center justify-between gap-4 flex-wrap">
+    <div>
+      <h2 class="font-semibold flex items-center gap-2">{{ icon('key-round') }}Conexiones Meta</h2>
+      <p class="text-sm text-muted mt-1">Guarda multiples tokens, prueba si sirven y deja una conexion activa para trabajar en toda la pagina.</p>
+    </div>
+    {% if active_connection %}
+    <div class="text-xs bg-bg border border-border rounded px-3 py-2">
+      Activa: <strong>{{ active_connection.name }}</strong>{% if active_connection.business_name %} - {{ active_connection.business_name }}{% endif %}
+    </div>
+    {% endif %}
+  </div>
+
+  <form method="post" action="/setup/meta-connections" class="grid grid-cols-1 md:grid-cols-2 gap-4">
+    <div>
+      <label class="block text-sm font-medium mb-1">Nombre de la conexion</label>
+      <input name="name" required class="w-full bg-bg border border-border rounded px-3 py-2" placeholder="BM USA Principal">
+    </div>
+    <div>
+      <label class="block text-sm font-medium mb-1">Business Manager inicial</label>
+      <input name="business_id" class="w-full bg-bg border border-border rounded px-3 py-2 font-mono text-xs" placeholder="Opcional: 631835841698356">
+    </div>
+    <div class="md:col-span-2">
+      <label class="block text-sm font-medium mb-1">Token de Meta</label>
+      <textarea spellcheck="false" name="token" rows="3" required class="w-full bg-bg border border-border rounded px-3 py-2 font-mono text-xs" placeholder="EAAB... con scopes ads_management, business_management, catalog_management"></textarea>
+    </div>
+    <label class="flex items-center gap-2 text-sm">
+      <input type="checkbox" name="activate_now" value="yes" checked class="w-4 h-4">
+      Activar al guardar
+    </label>
+    <div class="md:col-span-2">
+      <button type="submit" class="bg-accent hover:bg-accent/80 text-white px-5 py-2 rounded font-medium flex items-center gap-2">{{ icon('plus') }}Guardar y probar conexion</button>
+    </div>
+  </form>
+
+  {% if connections %}
+  <div class="overflow-x-auto border border-border rounded-lg">
+    <table class="min-w-full text-sm">
+      <thead class="bg-bg/70 text-muted">
+        <tr>
+          <th class="text-left px-4 py-3">Nombre</th>
+          <th class="text-left px-4 py-3">BM</th>
+          <th class="text-left px-4 py-3">Token</th>
+          <th class="text-left px-4 py-3">Estado</th>
+          <th class="text-left px-4 py-3">Acciones</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for connection in connections %}
+        <tr class="border-t border-border">
+          <td class="px-4 py-3">
+            <div class="font-medium">{{ connection.name }}</div>
+            {% if connection.is_active %}<div class="text-xs text-ok">Activa</div>{% endif %}
+          </td>
+          <td class="px-4 py-3 text-xs">
+            {% if connection.business_name or connection.business_id %}
+              {{ connection.business_name or 'Sin nombre' }}{% if connection.business_id %} ({{ connection.business_id }}){% endif %}
+            {% else %}
+              <span class="text-muted">Sin BM seleccionado</span>
+            {% endif %}
+          </td>
+          <td class="px-4 py-3 font-mono text-xs">****{{ connection.token_last4 or '----' }}</td>
+          <td class="px-4 py-3 text-xs">
+            {% if connection.is_valid %}
+              <span class="text-ok">Valido</span>
+            {% else %}
+              <span class="text-err">Sin validar</span>
+            {% endif %}
+            {% if connection.last_tested_at %}<div class="text-muted">{{ connection.last_tested_at }}</div>{% endif %}
+            {% if connection.last_error %}<div class="text-err mt-1">{{ connection.last_error }}</div>{% endif %}
+          </td>
+          <td class="px-4 py-3">
+            <div class="flex flex-wrap gap-2">
+              <form method="post" action="/setup/meta-connections/{{ connection.id }}/test">
+                <button class="bg-panel border border-border hover:bg-border px-3 py-2 rounded text-xs flex items-center gap-1">{{ icon('shield-check') }}Probar</button>
+              </form>
+              {% if not connection.is_active %}
+              <form method="post" action="/setup/meta-connections/{{ connection.id }}/activate">
+                <button class="bg-ok hover:bg-ok/80 text-white px-3 py-2 rounded text-xs flex items-center gap-1">{{ icon('check') }}Activar</button>
+              </form>
+              {% endif %}
+              <form method="post" action="/setup/meta-connections/{{ connection.id }}/delete" onsubmit="return confirm('¿Borrar esta conexion?')">
+                <button class="bg-err hover:bg-err/80 text-white px-3 py-2 rounded text-xs flex items-center gap-1">{{ icon('trash-2') }}Borrar</button>
+              </form>
+            </div>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% endif %}
+</div>
 
 <form method="post" class="bg-panel border border-border rounded-lg p-6 space-y-5">
   <h2 class="font-semibold flex items-center gap-2">{{ icon('plug') }}Conexiones por default a Meta</h2>
@@ -29,6 +123,7 @@
       <option value="{{ b.id }}" {% if settings and settings.default_business_id == b.id %}selected{% endif %}>{{ b.name }} ({{ b.id }})</option>
       {% endfor %}
     </select>
+    {% if active_connection and active_connection.business_name %}<p class="text-xs text-muted mt-1">BM guardado en la conexion activa: {{ active_connection.business_name }}</p>{% endif %}
   </div>
 
   <div>

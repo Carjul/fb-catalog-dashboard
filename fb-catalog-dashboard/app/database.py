@@ -22,6 +22,8 @@ mongo_db = client[MONGODB_DB_NAME]
 
 def _ensure_indexes():
     mongo_db["app_settings"].create_index([("id", ASCENDING)], unique=True)
+    mongo_db["meta_connections"].create_index([("id", ASCENDING)], unique=True)
+    mongo_db["meta_connections"].create_index([("is_active", ASCENDING)])
     mongo_db["catalogs"].create_index([("id", ASCENDING)], unique=True)
     mongo_db["catalogs"].create_index([("fb_catalog_id", ASCENDING)], unique=True, sparse=True)
     mongo_db["catalogs"].create_index([("feed_slug", ASCENDING)], unique=True)

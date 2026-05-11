@@ -4,6 +4,7 @@ from fastapi.responses import RedirectResponse
 
 from .. import meta_api
 from ..database import MongoSession, get_db
+from ..meta_connections import get_active_token
 from ..models import Campaign, Catalog, ProductSet, CampaignTemplate, AppSettings
 
 router = APIRouter()
@@ -36,12 +37,14 @@ def new_campaign(request: Request, db: MongoSession = Depends(get_db)):
     templates = db.query(CampaignTemplate).order_by(CampaignTemplate.created_at.desc()).all()
 
     accounts, pages, pixels = [], [], []
+    token = get_active_token(db)
     try:
-        accounts = meta_api.list_ad_accounts()
-        pages = meta_api.list_pages()
+        if token:
+            accounts = meta_api.list_ad_accounts(token=token)
+            pages = meta_api.list_pages(token=token)
         if s and s.default_ad_account_id:
             try:
-                pixels = meta_api.list_pixels(s.default_ad_account_id)
+                pixels = meta_api.list_pixels(s.default_ad_account_id, token=token)
             except Exception:
                 pass
     except Exception:
@@ -60,6 +63,10 @@ def new_campaign(request: Request, db: MongoSession = Depends(get_db)):
 async def create_campaign(request: Request, db: MongoSession = Depends(get_db)):
     form = await request.form()
     cfg = {k: v for k, v in form.items()}
+    token = get_active_token(db)
+
+    if not token:
+        raise HTTPException(400, "No hay una conexion Meta activa")
 
     name = cfg.get("name", "").strip()
     ad_account_id = cfg.get("ad_account_id", "").replace("act_", "")
@@ -120,7 +127,7 @@ async def create_campaign(request: Request, db: MongoSession = Depends(get_db)):
             except ValueError:
                 pass
 
-        camp_res = meta_api.create_campaign(ad_account_id, camp_payload)
+        camp_res = meta_api.create_campaign(ad_account_id, camp_payload, token=token)
         out["campaign_id"] = camp_res["id"]
         log_lines.append(f"campaign {camp_res['id']}")
 
@@ -167,7 +174,7 @@ async def create_campaign(request: Request, db: MongoSession = Depends(get_db)):
             except ValueError:
                 pass
 
-        adset_res = meta_api.create_adset(ad_account_id, adset_payload)
+        adset_res = meta_api.create_adset(ad_account_id, adset_payload, token=token)
         out["adset_id"] = adset_res["id"]
         log_lines.append(f"adset {adset_res['id']}")
 
@@ -197,7 +204,7 @@ async def create_campaign(request: Request, db: MongoSession = Depends(get_db)):
         if multi_advertiser_optout:
             creative_payload["is_multi_advertiser_ads_opted_in"] = False
 
-        creative_res = meta_api.create_adcreative(ad_account_id, creative_payload)
+        creative_res = meta_api.create_adcreative(ad_account_id, creative_payload, token=token)
         out["creative_id"] = creative_res["id"]
         log_lines.append(f"creative {creative_res['id']}")
 
@@ -207,7 +214,7 @@ async def create_campaign(request: Request, db: MongoSession = Depends(get_db)):
             "creative": json.dumps({"creative_id": creative_res["id"]}),
             "status": "PAUSED",
         }
-        ad_res = meta_api.create_ad(ad_account_id, ad_payload)
+        ad_res = meta_api.create_ad(ad_account_id, ad_payload, token=token)
         out["ad_id"] = ad_res["id"]
         log_lines.append(f"ad {ad_res['id']}")
 
