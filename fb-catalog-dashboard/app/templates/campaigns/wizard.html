@@ -41,7 +41,7 @@
       </div>
       <div>
         <label class="block text-sm font-medium mb-1 flex items-center">Objetivo
-          {{ tip("OUTCOME_SALES es lo normal para campañas de venta con catálogo. Los demás son para tráfico, leads, etc.") }}
+          {{ tip("Las campanas de este dashboard usan catalogo, asi que por ahora solo se soporta OUTCOME_SALES.") }}
         </label>
         <select name="objective" class="w-full bg-bg border border-border rounded px-3 py-2">
           {% for o in objectives %}<option value="{{ o }}" {% if form and form.objective == o %}selected{% endif %}>{{ o }}</option>{% endfor %}
@@ -59,7 +59,7 @@
         </label>
         <select name="budget_type" class="w-full bg-bg border border-border rounded px-3 py-2">
           <option value="daily">Diario</option>
-          <option value="lifetime">Total</option>
+          <option value="lifetime" disabled>Total (proximamente)</option>
         </select>
       </div>
       <div>

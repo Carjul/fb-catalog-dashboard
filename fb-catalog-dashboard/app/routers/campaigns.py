@@ -17,7 +17,7 @@ BID_STRATEGIES = [
     ("LOWEST_COST_WITH_BID_CAP", "Límite de puja"),
 ]
 CTAS = ["LEARN_MORE", "SHOP_NOW", "SIGN_UP", "SUBSCRIBE", "GET_OFFER", "APPLY_NOW", "DOWNLOAD"]
-OBJECTIVES = ["OUTCOME_SALES", "OUTCOME_LEADS", "OUTCOME_TRAFFIC", "OUTCOME_AWARENESS", "OUTCOME_ENGAGEMENT"]
+OBJECTIVES = ["OUTCOME_SALES"]
 EVENT_TYPES = ["PURCHASE", "INITIATE_CHECKOUT", "ADD_TO_CART", "LEAD", "COMPLETE_REGISTRATION", "VIEW_CONTENT"]
 
 
@@ -66,6 +66,7 @@ async def create_campaign(request: Request, db: MongoSession = Depends(get_db)):
     form = await request.form()
     cfg = {k: v for k, v in form.items()}
     token = get_active_token(db)
+    defaults = get_effective_defaults(db)
 
     if not token:
         raise HTTPException(400, "No hay una conexion Meta activa")
@@ -96,6 +97,15 @@ async def create_campaign(request: Request, db: MongoSession = Depends(get_db)):
         raise HTTPException(400, "Product set debe estar sincronizado con Meta antes")
     catalog = db.query(Catalog).filter(Catalog.id == pset.catalog_id).first()
 
+    if objective != "OUTCOME_SALES":
+        raise HTTPException(400, "Por ahora las campanas de catalogo solo soportan OUTCOME_SALES")
+    if budget_type != "daily":
+        raise HTTPException(400, "Por ahora solo esta soportado presupuesto diario para evitar errores de Meta")
+    if not page_id:
+        raise HTTPException(400, "Selecciona una pagina de Facebook")
+    if not pixel_id:
+        raise HTTPException(400, "Selecciona un pixel")
+
     lander = cfg.get("lander", "")
     message = cfg.get("message", "{{product.description}}")
     cta_type = cfg.get("cta_type", "LEARN_MORE")
@@ -114,15 +124,12 @@ async def create_campaign(request: Request, db: MongoSession = Depends(get_db)):
             "name": name,
             "objective": objective,
             "status": "PAUSED",
-            "buying_type": "AUCTION",
             "special_ad_categories": json.dumps([]),
-            "bid_strategy": bid_strategy,
         }
         if cbo:
-            if budget_type == "daily":
-                camp_payload["daily_budget"] = int(budget_amount * 100)
-            else:
-                camp_payload["lifetime_budget"] = int(budget_amount * 100)
+            camp_payload["daily_budget"] = int(budget_amount * 100)
+            if bid_strategy != "LOWEST_COST_WITHOUT_CAP":
+                camp_payload["bid_strategy"] = bid_strategy
         if spend_cap:
             try:
                 camp_payload["spend_cap"] = int(float(spend_cap) * 100)
@@ -161,10 +168,9 @@ async def create_campaign(request: Request, db: MongoSession = Depends(get_db)):
             "status": "PAUSED",
         }
         if not cbo:
-            if budget_type == "daily":
-                adset_payload["daily_budget"] = int(budget_amount * 100)
-            else:
-                adset_payload["lifetime_budget"] = int(budget_amount * 100)
+            adset_payload["daily_budget"] = int(budget_amount * 100)
+            if bid_strategy != "LOWEST_COST_WITHOUT_CAP":
+                adset_payload["bid_strategy"] = bid_strategy
 
         if bid_strategy == "COST_CAP" and bid_amount:
             adset_payload["bid_amount"] = int(float(bid_amount) * 100)
@@ -222,8 +228,9 @@ async def create_campaign(request: Request, db: MongoSession = Depends(get_db)):
 
     except Exception as e:
         return request.app.state.templates.TemplateResponse(request, "campaigns/wizard.html", {
-            "request": request, "error": str(e),
+            "request": request, "error": f"Error creando campana en Meta: {e}",
             "settings": db.query(AppSettings).first(),
+            "defaults": defaults,
             "catalogs": db.query(Catalog).all(),
             "sets": db.query(ProductSet).all(),
             "templates": db.query(CampaignTemplate).all(),
