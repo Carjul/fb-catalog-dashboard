@@ -3,6 +3,7 @@ from fastapi import APIRouter, Depends, Request, Form, HTTPException
 from fastapi.responses import RedirectResponse
 
 from .. import meta_api
+from ..meta_api import MetaApiError
 from ..database import MongoSession, get_db
 from ..meta_connections import get_active_token, get_effective_defaults
 from ..models import Campaign, Catalog, ProductSet, CampaignTemplate, AppSettings
@@ -116,7 +117,6 @@ async def create_campaign(request: Request, db: MongoSession = Depends(get_db)):
 
     save_template = cfg.get("save_as_template", "")
 
-    log_lines = []
     out = {}
 
     try:
@@ -138,20 +138,11 @@ async def create_campaign(request: Request, db: MongoSession = Depends(get_db)):
 
         camp_res = meta_api.create_campaign(ad_account_id, camp_payload, token=token)
         out["campaign_id"] = camp_res["id"]
-        log_lines.append(f"campaign {camp_res['id']}")
 
         targeting = {
-            "age_min": age_min, "age_max": age_max,
+            "age_min": age_min,
+            "age_max": age_max,
             "geo_locations": {"countries": countries},
-            "publisher_platforms": ["facebook", "instagram", "audience_network", "messenger"],
-            "facebook_positions": ["feed", "biz_disco_feed", "facebook_reels",
-                                   "facebook_reels_overlay", "profile_feed", "right_hand_column",
-                                   "notification", "instream_video", "marketplace", "story", "search"],
-            "instagram_positions": ["stream", "ig_search", "story", "explore", "reels",
-                                    "explore_home", "profile_feed"],
-            "device_platforms": ["mobile", "desktop"],
-            "messenger_positions": ["story"],
-            "audience_network_positions": ["classic", "rewarded_video"],
         }
 
         adset_payload = {
@@ -184,7 +175,6 @@ async def create_campaign(request: Request, db: MongoSession = Depends(get_db)):
 
         adset_res = meta_api.create_adset(ad_account_id, adset_payload, token=token)
         out["adset_id"] = adset_res["id"]
-        log_lines.append(f"adset {adset_res['id']}")
 
         headline = cfg.get("headline", "").strip() or "{{product.name}}"
         link_description = cfg.get("link_description", "").strip()
@@ -196,8 +186,6 @@ async def create_campaign(request: Request, db: MongoSession = Depends(get_db)):
         }
         if link_description:
             td["description"] = link_description
-        if use_video:
-            td["format_option"] = "single_video"
         story_spec = {"page_id": page_id, "template_data": td}
         if instagram_id:
             story_spec["instagram_user_id"] = instagram_id
@@ -209,12 +197,9 @@ async def create_campaign(request: Request, db: MongoSession = Depends(get_db)):
         }
         if url_tags:
             creative_payload["url_tags"] = url_tags
-        if multi_advertiser_optout:
-            creative_payload["is_multi_advertiser_ads_opted_in"] = False
 
         creative_res = meta_api.create_adcreative(ad_account_id, creative_payload, token=token)
         out["creative_id"] = creative_res["id"]
-        log_lines.append(f"creative {creative_res['id']}")
 
         ad_payload = {
             "name": f"AD-{name}",
@@ -224,11 +209,37 @@ async def create_campaign(request: Request, db: MongoSession = Depends(get_db)):
         }
         ad_res = meta_api.create_ad(ad_account_id, ad_payload, token=token)
         out["ad_id"] = ad_res["id"]
-        log_lines.append(f"ad {ad_res['id']}")
+
+    except MetaApiError as e:
+        step = "campaign"
+        if out.get("campaign_id") and not out.get("adset_id"):
+            step = "adset"
+        elif out.get("adset_id") and not out.get("creative_id"):
+            step = "creative"
+        elif out.get("creative_id"):
+            step = "ad"
+        message = e.payload.get("error", {}).get("message", str(e))
+        subcode = e.payload.get("error", {}).get("error_subcode")
+        user_title = e.payload.get("error", {}).get("error_user_title")
+        user_msg = e.payload.get("error", {}).get("error_user_msg")
+        detail_parts = [f"Paso: {step}", f"Meta: {message}"]
+        if user_title:
+            detail_parts.append(user_title)
+        if user_msg:
+            detail_parts.append(user_msg)
+        if subcode:
+            detail_parts.append(f"subcode {subcode}")
+        error_message = " | ".join(detail_parts)
 
     except Exception as e:
+        error_message = f"Error creando campana en Meta: {e}"
+
+    else:
+        error_message = None
+
+    if error_message:
         return request.app.state.templates.TemplateResponse(request, "campaigns/wizard.html", {
-            "request": request, "error": f"Error creando campana en Meta: {e}",
+            "request": request, "error": error_message,
             "settings": db.query(AppSettings).first(),
             "defaults": defaults,
             "catalogs": db.query(Catalog).all(),
