@@ -120,7 +120,7 @@
     <select name="business_id" class="w-full bg-bg border border-border rounded px-3 py-2">
       <option value="">— Ninguno —</option>
       {% for b in businesses %}
-      <option value="{{ b.id }}" {% if settings and settings.default_business_id == b.id %}selected{% endif %}>{{ b.name }} ({{ b.id }})</option>
+      <option value="{{ b.id }}" {% if defaults and defaults.business_id == b.id %}selected{% endif %}>{{ b.name }} ({{ b.id }})</option>
       {% endfor %}
     </select>
     {% if active_connection and active_connection.business_name %}<p class="text-xs text-muted mt-1">BM guardado en la conexion activa: {{ active_connection.business_name }}</p>{% endif %}
@@ -133,7 +133,7 @@
     <select name="ad_account_id" class="w-full bg-bg border border-border rounded px-3 py-2">
       <option value="">— Ninguna —</option>
       {% for a in accounts %}
-      <option value="{{ a.id }}" {% if settings and settings.default_ad_account_id == a.id %}selected{% endif %}>{{ a.name }} ({{ a.currency }})</option>
+      <option value="{{ a.id }}" {% if defaults and defaults.ad_account_id == a.id %}selected{% endif %}>{{ a.name }} ({{ a.currency }})</option>
       {% endfor %}
     </select>
   </div>
@@ -145,7 +145,7 @@
     <select name="page_id" class="w-full bg-bg border border-border rounded px-3 py-2">
       <option value="">— Ninguna —</option>
       {% for p in pages %}
-      <option value="{{ p.id }}" {% if settings and settings.default_page_id == p.id %}selected{% endif %}>{{ p.name }}</option>
+      <option value="{{ p.id }}" {% if defaults and defaults.page_id == p.id %}selected{% endif %}>{{ p.name }}</option>
       {% endfor %}
     </select>
   </div>
@@ -157,7 +157,7 @@
     <select name="pixel_id" class="w-full bg-bg border border-border rounded px-3 py-2">
       <option value="">— Ninguno —</option>
       {% for p in pixels %}
-      <option value="{{ p.id }}" {% if settings and settings.default_pixel_id == p.id %}selected{% endif %}>{{ p.name }} ({{ p.id }})</option>
+      <option value="{{ p.id }}" {% if defaults and defaults.pixel_id == p.id %}selected{% endif %}>{{ p.name }} ({{ p.id }})</option>
       {% endfor %}
     </select>
     <p class="text-xs text-muted mt-1">Los pixeles se cargan según la cuenta seleccionada. Guarda y refresca para ver los pixeles de la cuenta nueva.</p>
@@ -171,10 +171,10 @@
   <p class="text-sm text-muted">Cuando un ad sea aprobado o llegue una conversión nueva, recibe un mensaje. Se revisa cada hora junto con el cron del truco.</p>
 
   <form method="post" action="/setup" class="space-y-5">
-    <input type="hidden" name="business_id" value="{{ settings.default_business_id or '' }}">
-    <input type="hidden" name="ad_account_id" value="{{ settings.default_ad_account_id or '' }}">
-    <input type="hidden" name="page_id" value="{{ settings.default_page_id or '' }}">
-    <input type="hidden" name="pixel_id" value="{{ settings.default_pixel_id or '' }}">
+    <input type="hidden" name="business_id" value="{{ defaults.business_id or '' }}">
+    <input type="hidden" name="ad_account_id" value="{{ defaults.ad_account_id or '' }}">
+    <input type="hidden" name="page_id" value="{{ defaults.page_id or '' }}">
+    <input type="hidden" name="pixel_id" value="{{ defaults.pixel_id or '' }}">
 
     <div class="grid grid-cols-2 gap-4">
       <div>

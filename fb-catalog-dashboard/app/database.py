@@ -55,7 +55,7 @@ class Query:
         items = []
         for raw in self.session.database[self.model.__collection__].find({}, {"_id": 0}):
             obj = self.model.from_mongo(raw)
-            self.session._register(obj, is_new=False)
+            obj = self.session._register(obj, is_new=False)
             if self._matches(obj):
                 items.append(obj)
         for sort_spec in reversed(self.sort_specs):
@@ -93,13 +93,16 @@ class MongoSession:
     def _register(self, obj, is_new: bool):
         obj_id = getattr(obj, "id", None)
         if obj_id is None:
-            return
+            return obj
         key = self._key_for(type(obj), obj_id)
         if key not in self._tracked:
             self._tracked[key] = obj
             self._snapshots[key] = deepcopy(obj.to_mongo())
+        else:
+            obj = self._tracked[key]
         if is_new:
             self._new.add(key)
+        return obj
 
     def _next_id(self, collection_name: str) -> int:
         result = self.database["_counters"].find_one_and_update(

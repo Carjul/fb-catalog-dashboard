@@ -4,7 +4,7 @@ from fastapi.responses import RedirectResponse
 
 from .. import meta_api
 from ..database import MongoSession, get_db
-from ..meta_connections import get_active_token
+from ..meta_connections import get_active_token, get_effective_defaults
 from ..models import Catalog, AppSettings
 from ..config import PUBLIC_BASE_URL
 
@@ -23,8 +23,10 @@ def list_catalogs(request: Request, db: MongoSession = Depends(get_db)):
 @router.get("/catalogs/new")
 def new_catalog(request: Request, db: MongoSession = Depends(get_db)):
     s = db.query(AppSettings).first()
+    defaults = get_effective_defaults(db)
     return request.app.state.templates.TemplateResponse(request, "catalogs/create.html", {
         "request": request, "settings": s,
+        "defaults": defaults,
     })
 
 

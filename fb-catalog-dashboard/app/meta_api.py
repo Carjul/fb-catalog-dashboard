@@ -24,10 +24,10 @@ def _request(method: str, path: str, *, token: Optional[str] = None, params: Opt
 
     for attempt in range(retries):
         try:
-            r = requests.request(method, url, params=p if method == "GET" else None,
-                                 data=data if method != "GET" else None,
-                                 timeout=60,
-                                 **({"params": p} if method != "GET" else {}))
+            if method == "GET":
+                r = requests.request(method, url, params=p, timeout=60)
+            else:
+                r = requests.request(method, url, params=p, data=data, timeout=60)
             try:
                 payload = r.json()
             except ValueError:

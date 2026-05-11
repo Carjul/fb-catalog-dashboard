@@ -4,7 +4,7 @@ from fastapi.responses import RedirectResponse
 
 from .. import meta_api
 from ..database import MongoSession, get_db
-from ..meta_connections import get_active_token
+from ..meta_connections import get_active_token, get_effective_defaults
 from ..models import Campaign, Catalog, ProductSet, CampaignTemplate, AppSettings
 
 router = APIRouter()
@@ -32,6 +32,7 @@ def list_campaigns(request: Request, db: MongoSession = Depends(get_db)):
 @router.get("/campaigns/new")
 def new_campaign(request: Request, db: MongoSession = Depends(get_db)):
     s = db.query(AppSettings).first()
+    defaults = get_effective_defaults(db)
     catalogs = db.query(Catalog).all()
     sets = db.query(ProductSet).all()
     templates = db.query(CampaignTemplate).order_by(CampaignTemplate.created_at.desc()).all()
@@ -42,9 +43,9 @@ def new_campaign(request: Request, db: MongoSession = Depends(get_db)):
         if token:
             accounts = meta_api.list_ad_accounts(token=token)
             pages = meta_api.list_pages(token=token)
-        if s and s.default_ad_account_id:
+        if defaults["ad_account_id"]:
             try:
-                pixels = meta_api.list_pixels(s.default_ad_account_id, token=token)
+                pixels = meta_api.list_pixels(defaults["ad_account_id"], token=token)
             except Exception:
                 pass
     except Exception:
@@ -52,6 +53,7 @@ def new_campaign(request: Request, db: MongoSession = Depends(get_db)):
 
     return request.app.state.templates.TemplateResponse(request, "campaigns/wizard.html", {
         "request": request, "settings": s,
+        "defaults": defaults,
         "catalogs": catalogs, "sets": sets, "templates": templates,
         "accounts": accounts, "pages": pages, "pixels": pixels,
         "bid_strategies": BID_STRATEGIES, "ctas": CTAS,

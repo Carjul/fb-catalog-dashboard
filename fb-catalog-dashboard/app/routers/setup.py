@@ -6,6 +6,7 @@ from fastapi.responses import RedirectResponse
 from .. import meta_api
 from ..database import MongoSession, get_db
 from ..meta_connections import (
+    get_effective_defaults,
     get_active_connection,
     get_active_token,
     list_connections,
@@ -33,6 +34,7 @@ def _build_setup_context(request: Request, db: MongoSession, *, error: str | Non
     settings = _get_settings(db)
     connections = list_connections(db)
     active_connection = get_active_connection(db)
+    defaults = get_effective_defaults(db)
     token = get_active_token(db)
 
     accounts, pages, businesses, pixels = [], [], [], []
@@ -51,17 +53,28 @@ def _build_setup_context(request: Request, db: MongoSession, *, error: str | Non
             businesses = meta_api.list_businesses(token=token)
         except Exception as exc:
             errors.append(f"Business Managers: {exc}")
-        if settings.default_ad_account_id:
+        if defaults["ad_account_id"]:
             try:
-                pixels = meta_api.list_pixels(settings.default_ad_account_id, token=token)
+                pixels = meta_api.list_pixels(defaults["ad_account_id"], token=token)
             except Exception as exc:
                 errors.append(f"Pixeles: {exc}")
+
+    selected_business_id = defaults["business_id"]
+    if selected_business_id and not any(b.get("id") == selected_business_id for b in businesses):
+        fallback_name = None
+        if active_connection and active_connection.business_id == selected_business_id:
+            fallback_name = active_connection.business_name
+        businesses = businesses + [{
+            "id": selected_business_id,
+            "name": fallback_name or "BM guardado",
+        }]
 
     return {
         "request": request,
         "settings": settings,
         "connections": connections,
         "active_connection": active_connection,
+        "defaults": defaults,
         "accounts": accounts,
         "pages": pages,
         "businesses": businesses,
@@ -189,10 +202,6 @@ def setup_save(
     notify_on_conversion: str = Form(""),
 ):
     s = _get_settings(db)
-    s.default_business_id = business_id or None
-    s.default_ad_account_id = ad_account_id or None
-    s.default_page_id = page_id or None
-    s.default_pixel_id = pixel_id or None
     s.telegram_bot_token = telegram_bot_token or None
     s.telegram_chat_id = telegram_chat_id or None
     s.slack_webhook_url = slack_webhook_url or None
@@ -202,6 +211,9 @@ def setup_save(
     active_connection = get_active_connection(db)
     if active_connection:
         active_connection.business_id = business_id or None
+        active_connection.default_ad_account_id = ad_account_id or None
+        active_connection.default_page_id = page_id or None
+        active_connection.default_pixel_id = pixel_id or None
         active_connection.business_name = None
         if business_id:
             try:
@@ -212,6 +224,11 @@ def setup_save(
                         break
             except Exception:
                 pass
+    else:
+        s.default_business_id = business_id or None
+        s.default_ad_account_id = ad_account_id or None
+        s.default_page_id = page_id or None
+        s.default_pixel_id = pixel_id or None
 
     db.commit()
     return RedirectResponse("/setup?saved=1", status_code=303)

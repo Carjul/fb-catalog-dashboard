@@ -4,7 +4,7 @@ from datetime import datetime
 
 from . import meta_api
 from .config import FB_ACCESS_TOKEN
-from .models import MetaConnection
+from .models import AppSettings, MetaConnection
 
 
 def list_connections(db):
@@ -28,6 +28,17 @@ def get_active_token(db):
     if connection and connection.token:
         return connection.token
     return FB_ACCESS_TOKEN or None
+
+
+def get_effective_defaults(db):
+    settings = db.query(AppSettings).first()
+    connection = get_active_connection(db)
+    return {
+        "business_id": (connection.business_id if connection and connection.business_id else getattr(settings, "default_business_id", None)),
+        "ad_account_id": (connection.default_ad_account_id if connection and connection.default_ad_account_id else getattr(settings, "default_ad_account_id", None)),
+        "page_id": (connection.default_page_id if connection and connection.default_page_id else getattr(settings, "default_page_id", None)),
+        "pixel_id": (connection.default_pixel_id if connection and connection.default_pixel_id else getattr(settings, "default_pixel_id", None)),
+    }
 
 
 def has_any_token(db) -> bool:
