@@ -97,6 +97,8 @@ async def create_campaign(request: Request, db: MongoSession = Depends(get_db)):
     if not pset or not pset.fb_set_id:
         raise HTTPException(400, "Product set debe estar sincronizado con Meta antes")
     catalog = db.query(Catalog).filter(Catalog.id == pset.catalog_id).first()
+    if not catalog or not catalog.fb_catalog_id or catalog.fb_catalog_id.startswith("local-"):
+        raise HTTPException(400, "El catalogo del product set debe estar sincronizado con Meta antes")
 
     if objective != "OUTCOME_SALES":
         raise HTTPException(400, "Por ahora las campanas de catalogo solo soportan OUTCOME_SALES")
@@ -106,6 +108,10 @@ async def create_campaign(request: Request, db: MongoSession = Depends(get_db)):
         raise HTTPException(400, "Selecciona una pagina de Facebook")
     if not pixel_id:
         raise HTTPException(400, "Selecciona un pixel")
+    if bid_strategy in {"COST_CAP", "LOWEST_COST_WITH_BID_CAP"} and not str(bid_amount).strip():
+        raise HTTPException(400, "La estrategia de puja seleccionada requiere Bid amount")
+    if bid_strategy == "LOWEST_COST_WITH_MIN_ROAS" and not str(roas_floor).strip():
+        raise HTTPException(400, "La estrategia de puja ROAS requiere ROAS floor")
 
     lander = cfg.get("lander", "")
     message = cfg.get("message", "{{product.description}}")
