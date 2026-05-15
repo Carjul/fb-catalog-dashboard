@@ -131,6 +131,7 @@ async def create_campaign(request: Request, db: MongoSession = Depends(get_db)):
             "objective": objective,
             "status": "PAUSED",
             "special_ad_categories": json.dumps([]),
+            "is_adset_budget_sharing_enabled": cbo,
         }
         if cbo:
             camp_payload["daily_budget"] = int(budget_amount * 100)
@@ -149,6 +150,7 @@ async def create_campaign(request: Request, db: MongoSession = Depends(get_db)):
             "age_min": age_min,
             "age_max": age_max,
             "geo_locations": {"countries": countries},
+            "targeting_automation": {"advantage_audience": 0},
         }
 
         adset_payload = {

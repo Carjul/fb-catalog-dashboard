@@ -12,7 +12,23 @@ class MetaApiError(Exception):
     def __init__(self, status: int, payload: dict):
         self.status = status
         self.payload = payload
-        msg = payload.get("error", {}).get("message") or json.dumps(payload)[:300]
+        error = payload.get("error", {}) if isinstance(payload, dict) else {}
+        parts = []
+        if status:
+            parts.append(f"HTTP {status}")
+        if error.get("type"):
+            parts.append(error["type"])
+        if error.get("code") is not None:
+            parts.append(f"code {error['code']}")
+        if error.get("error_subcode") is not None:
+            parts.append(f"subcode {error['error_subcode']}")
+        if error.get("message"):
+            parts.append(error["message"])
+        if error.get("error_user_msg"):
+            parts.append(error["error_user_msg"])
+        if error.get("fbtrace_id"):
+            parts.append(f"trace {error['fbtrace_id']}")
+        msg = " | ".join(parts) or json.dumps(payload)[:300]
         super().__init__(f"[{status}] {msg}")
 
 
