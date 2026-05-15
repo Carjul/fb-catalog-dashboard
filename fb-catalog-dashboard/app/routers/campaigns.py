@@ -126,12 +126,23 @@ async def create_campaign(request: Request, db: MongoSession = Depends(get_db)):
     out = {}
 
     try:
+        effective_instagram_id = instagram_id
+        if not effective_instagram_id:
+            try:
+                for page in meta_api.list_pages(token=token):
+                    if str(page.get("id")) == str(page_id):
+                        ig_account = page.get("instagram_business_account") or {}
+                        effective_instagram_id = ig_account.get("id") or None
+                        break
+            except Exception:
+                pass
+
         camp_payload = {
             "name": name,
             "objective": objective,
             "status": "PAUSED",
             "special_ad_categories": json.dumps([]),
-            "is_adset_budget_sharing_enabled": cbo,
+            "is_adset_budget_sharing_enabled": False,
         }
         if cbo:
             camp_payload["daily_budget"] = int(budget_amount * 100)
@@ -152,6 +163,8 @@ async def create_campaign(request: Request, db: MongoSession = Depends(get_db)):
             "geo_locations": {"countries": countries},
             "targeting_automation": {"advantage_audience": 0},
         }
+        if not effective_instagram_id:
+            targeting["publisher_platforms"] = ["facebook"]
 
         adset_payload = {
             "name": f"AS-{name}",
@@ -195,8 +208,8 @@ async def create_campaign(request: Request, db: MongoSession = Depends(get_db)):
         if link_description:
             td["description"] = link_description
         story_spec = {"page_id": page_id, "template_data": td}
-        if instagram_id:
-            story_spec["instagram_user_id"] = instagram_id
+        if effective_instagram_id:
+            story_spec["instagram_user_id"] = effective_instagram_id
 
         creative_payload = {
             "name": f"CR-{name}",
