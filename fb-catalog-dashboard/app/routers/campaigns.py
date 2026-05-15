@@ -19,7 +19,7 @@ BID_STRATEGIES = [
 ]
 CTAS = ["LEARN_MORE", "SHOP_NOW", "SIGN_UP", "SUBSCRIBE", "GET_OFFER", "APPLY_NOW", "DOWNLOAD"]
 OBJECTIVES = ["OUTCOME_SALES"]
-EVENT_TYPES = ["PURCHASE", "INITIATE_CHECKOUT", "ADD_TO_CART", "LEAD", "COMPLETE_REGISTRATION", "VIEW_CONTENT"]
+EVENT_TYPES = ["PURCHASE", "INITIATED_CHECKOUT", "ADD_TO_CART", "LEAD", "COMPLETE_REGISTRATION", "CONTENT_VIEW"]
 
 
 @router.get("/campaigns")
@@ -108,6 +108,8 @@ async def create_campaign(request: Request, db: MongoSession = Depends(get_db)):
         raise HTTPException(400, "Selecciona una pagina de Facebook")
     if not pixel_id:
         raise HTTPException(400, "Selecciona un pixel")
+    if not cfg.get("lander", "").strip():
+        raise HTTPException(400, "Lander URL es obligatoria")
     if bid_strategy in {"COST_CAP", "LOWEST_COST_WITH_BID_CAP"} and not str(bid_amount).strip():
         raise HTTPException(400, "La estrategia de puja seleccionada requiere Bid amount")
     if bid_strategy == "LOWEST_COST_WITH_MIN_ROAS" and not str(roas_floor).strip():
@@ -146,8 +148,6 @@ async def create_campaign(request: Request, db: MongoSession = Depends(get_db)):
         }
         if cbo:
             camp_payload["daily_budget"] = int(budget_amount * 100)
-            if bid_strategy != "LOWEST_COST_WITHOUT_CAP":
-                camp_payload["bid_strategy"] = bid_strategy
         if spend_cap:
             try:
                 camp_payload["spend_cap"] = int(float(spend_cap) * 100)
@@ -170,7 +170,7 @@ async def create_campaign(request: Request, db: MongoSession = Depends(get_db)):
             "name": f"AS-{name}",
             "campaign_id": camp_res["id"],
             "billing_event": "IMPRESSIONS",
-            "optimization_goal": "OFFSITE_CONVERSIONS",
+            "optimization_goal": "VALUE" if bid_strategy == "LOWEST_COST_WITH_MIN_ROAS" else "OFFSITE_CONVERSIONS",
             "promoted_object": json.dumps({
                 "product_set_id": pset.fb_set_id,
                 "pixel_id": pixel_id,
@@ -179,10 +179,10 @@ async def create_campaign(request: Request, db: MongoSession = Depends(get_db)):
             "targeting": json.dumps(targeting),
             "status": "PAUSED",
         }
+        if bid_strategy != "LOWEST_COST_WITHOUT_CAP":
+            adset_payload["bid_strategy"] = bid_strategy
         if not cbo:
             adset_payload["daily_budget"] = int(budget_amount * 100)
-            if bid_strategy != "LOWEST_COST_WITHOUT_CAP":
-                adset_payload["bid_strategy"] = bid_strategy
 
         if bid_strategy == "COST_CAP" and bid_amount:
             adset_payload["bid_amount"] = int(float(bid_amount) * 100)
@@ -208,14 +208,14 @@ async def create_campaign(request: Request, db: MongoSession = Depends(get_db)):
         if link_description:
             td["description"] = link_description
         story_spec = {"page_id": page_id, "template_data": td}
-        if effective_instagram_id:
-            story_spec["instagram_user_id"] = effective_instagram_id
 
         creative_payload = {
             "name": f"CR-{name}",
             "object_story_spec": json.dumps(story_spec),
             "product_set_id": pset.fb_set_id,
         }
+        if effective_instagram_id:
+            creative_payload["instagram_user_id"] = effective_instagram_id
         if url_tags:
             creative_payload["url_tags"] = url_tags
 
